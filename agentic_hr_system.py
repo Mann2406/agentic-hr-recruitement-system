@@ -233,13 +233,99 @@ async def upload_resume(application_id: str, file: UploadFile = File(...)):
 #     log(application_id, f"Interview scheduled: {app_data['interview_schedule']}")
 #     return {"status": app_data["status"], "interview_schedule": app_data["interview_schedule"]}
 
+# @app.post("/api/applications/{application_id}/schedule")
+# def schedule_interview(application_id: str, payload: ScheduleRequest):
+#     app_data = APPLICATIONS.get(application_id)
+#     if not app_data:
+#         raise HTTPException(status_code=404, detail="Application not found")
+
+#     # Must have passed screening
+#     if app_data["status"] not in ["screening_passed", "shortlisted"]:
+#         raise HTTPException(
+#             status_code=400,
+#             detail="Candidate not eligible for scheduling"
+#         )
+
+#     report = app_data.get("screening_report")
+#     if not report:
+#         raise HTTPException(
+#             status_code=400,
+#             detail="Screening report missing"
+#         )
+
+#     # Parse and normalize requested time
+#     requested_time = payload.scheduled_at
+
+#     if requested_time.tzinfo is None:
+#         # Assume frontend sent UTC if timezone missing
+#         requested_time = requested_time.replace(tzinfo=timezone.utc)
+
+#     # Convert to IST (Asia/Calcutta)
+#     tz_calcutta = timezone(timedelta(hours=5, minutes=30))
+#     requested_time_ist = requested_time.astimezone(tz_calcutta)
+
+#     # Enforce business hours: 9 AM – 5 PM IST
+#     if not (9 <= requested_time_ist.hour < 17):
+#         raise HTTPException(
+#             status_code=400,
+#             detail="Interview must be scheduled between 9 AM and 5 PM IST"
+#         )
+
+#     # Convert back to UTC for Calendly
+#     start_time_utc = requested_time_ist.astimezone(timezone.utc)
+
+#     payload_calendly = {
+#         "event_type": os.getenv("CALENDLY_EVENT_TYPE_URL"),
+#         "start_time": start_time_utc.isoformat(),
+#         "invitee": {
+#             "first_name": report["first_name"],
+#             "last_name": report["last_name"],
+#             "email": report["email"],
+#             "timezone": payload.timezone or "Asia/Calcutta"
+#         },
+#         "location": {"kind": "google_conference"}
+#     }
+
+#     headers = {
+#         "Authorization": f"Bearer {os.getenv('CALENDLY_TOKEN')}",
+#         "Content-Type": "application/json"
+#     }
+
+#     response = requests.post(
+#         "https://api.calendly.com/invitees",
+#         headers=headers,
+#         data=json.dumps(payload_calendly)
+#     )
+
+#     if response.status_code not in (200, 201):
+#         log(application_id, f"Calendly scheduling failed: {response.text}")
+#         raise HTTPException(
+#             status_code=500,
+#             detail="Calendly scheduling failed"
+#         )
+
+#     app_data["status"] = "interview_scheduled"
+#     app_data["interview_schedule"] = response.json().get("resource", {}).get("uri")
+
+#     log(
+#         application_id,
+#         f"Interview scheduled at {requested_time_ist.isoformat()}"
+#     )
+
+#     return {
+#         "status": "interview_scheduled",
+#         "interview_time_ist": requested_time_ist.isoformat(),
+#         "interview_schedule": app_data["interview_schedule"]
+#     }
+
+
 @app.post("/api/applications/{application_id}/schedule")
 def schedule_interview(application_id: str, payload: ScheduleRequest):
     app_data = APPLICATIONS.get(application_id)
     if not app_data:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    # Must have passed screening
+    # Must have passed screening or be shortlisted
     if app_data["status"] not in ["screening_passed", "shortlisted"]:
         raise HTTPException(
             status_code=400,
@@ -255,9 +341,7 @@ def schedule_interview(application_id: str, payload: ScheduleRequest):
 
     # Parse and normalize requested time
     requested_time = payload.scheduled_at
-
     if requested_time.tzinfo is None:
-        # Assume frontend sent UTC if timezone missing
         requested_time = requested_time.replace(tzinfo=timezone.utc)
 
     # Convert to IST (Asia/Calcutta)
@@ -304,7 +388,8 @@ def schedule_interview(application_id: str, payload: ScheduleRequest):
             detail="Calendly scheduling failed"
         )
 
-    app_data["status"] = "interview_scheduled"
+    # Keep the original shortlist status, track interview separately
+    app_data["interview_status"] = "scheduled"
     app_data["interview_schedule"] = response.json().get("resource", {}).get("uri")
 
     log(
@@ -313,7 +398,7 @@ def schedule_interview(application_id: str, payload: ScheduleRequest):
     )
 
     return {
-        "status": "interview_scheduled",
+        "status": app_data.get("status"),  # preserve original status (screening_passed / shortlisted)
         "interview_time_ist": requested_time_ist.isoformat(),
         "interview_schedule": app_data["interview_schedule"]
     }
