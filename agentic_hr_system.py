@@ -27,6 +27,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",   # React / Next.js
+        "http://localhost:4000",
         "http://localhost:5173",   # Vite
     ],
     allow_credentials=True,
