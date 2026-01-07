@@ -1,4 +1,10 @@
-langgraph
-langchain-groq
-langchain
+fastapi
+uvicorn
 python-dotenv
+requests
+langchain
+langchain-groq
+langchain-core
+pydantic
+PyPDF2
+docusign-esign

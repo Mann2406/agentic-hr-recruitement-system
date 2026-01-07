@@ -312,3 +312,8 @@ def run_compliance(application_id: str):
 @app.get("/api/applications/{application_id}/logs")
 def get_logs(application_id: str):
     return {"logs": LOGS.get(application_id, [])}
+
+# For Render / uvicorn compatibility
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
