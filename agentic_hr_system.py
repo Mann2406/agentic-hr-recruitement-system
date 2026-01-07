@@ -64,7 +64,7 @@ class ScreeningReport(TypedDict):
 
 class ScheduleRequest(BaseModel):
     scheduled_at: datetime
-    timezone: str
+    timezone: str = "Asia/Calcutta"
 
 
 class ShortlistDecision(BaseModel):
@@ -240,7 +240,7 @@ def schedule_interview(application_id: str, payload: ScheduleRequest):
         raise HTTPException(status_code=404, detail="Application not found")
 
     # Must have passed screening
-    if app_data["status"] != "screening_passed":
+    if app_data["status"] not in ["screening_passed", "shortlisted"]:
         raise HTTPException(
             status_code=400,
             detail="Candidate not eligible for scheduling"
