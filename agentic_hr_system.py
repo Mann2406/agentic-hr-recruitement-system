@@ -12,6 +12,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from docusign_esign import ApiClient, EnvelopesApi, EnvelopeDefinition, TemplateRole
 
+from fastapi import UploadFile, File
+
+from dotenv import load_dotenv
+load_dotenv()
 # ------------------------
 # APP
 # ------------------------
@@ -134,6 +138,36 @@ def run_screening(application_id: str):
         app_data["status"] = "screening_failed"
         return {"status": "screening_failed", "error": str(e)}
 
+
+@app.post("/api/applications/{application_id}/upload_resume")
+async def upload_resume(application_id: str, file: UploadFile = File(...)):
+    """
+    Upload a resume file (PDF or TXT) and store its text in the application.
+    """
+    app_data = APPLICATIONS.get(application_id)
+    if not app_data:
+        raise HTTPException(404, "Application not found")
+    
+    try:
+        resume_text = ""
+        if file.content_type == "application/pdf":
+            from PyPDF2 import PdfReader
+            reader = PdfReader(file.file)
+            for page in reader.pages:
+                resume_text += page.extract_text() or ""
+        elif file.content_type == "text/plain":
+            resume_text = (await file.read()).decode("utf-8")
+        else:
+            raise HTTPException(400, "Unsupported file type. Only PDF and TXT allowed.")
+
+        app_data["resume"] = resume_text
+        log(application_id, f"Resume uploaded and parsed ({file.filename})")
+        return {"status": "resume_uploaded", "resume_text_preview": resume_text[:200]}  # first 200 chars
+
+    except Exception as e:
+        log(application_id, f"Resume upload/parsing failed: {e}")
+        raise HTTPException(500, f"Failed to upload or parse resume: {e}")
+
 # ------------------------
 # 3. INTERVIEW SCHEDULING
 # ------------------------
@@ -179,6 +213,8 @@ def schedule_interview(application_id: str):
     app_data["interview_schedule"] = r.json().get("resource", {}).get("uri")
     log(application_id, f"Interview scheduled: {app_data['interview_schedule']}")
     return {"status": app_data["status"], "interview_schedule": app_data["interview_schedule"]}
+
+
 
 # ------------------------
 # 4. POST-INTERVIEW DECISION
@@ -242,7 +278,11 @@ def send_offer(application_id: str):
     )
 
     envelopes_api = EnvelopesApi(api_client)
-    result = envelopes_api.create_envelope(os.getenv("DOCUSIGN_ACCOUNT_ID"), envelope_definition)
+    result = envelopes_api.create_envelope(
+    account_id=os.getenv("DOCUSIGN_ACCOUNT_ID"),
+    envelope_definition=envelope_definition
+    )
+
 
     app_data["status"] = "offer_sent"
     app_data["offer_letter_url"] = f"Envelope ID: {result.envelope_id}"
