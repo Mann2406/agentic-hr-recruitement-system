@@ -14,12 +14,26 @@ from docusign_esign import ApiClient, EnvelopesApi, EnvelopeDefinition, Template
 
 from fastapi import UploadFile, File
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from dotenv import load_dotenv
 load_dotenv()
 # ------------------------
 # APP
 # ------------------------
-app = FastAPI(title="Agentic Recruitment Backend (LangGraph Style)")
+app = FastAPI(title="Agentic Recruitment Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",   # React / Next.js
+        "http://localhost:5173",   # Vite
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ------------------------
 # LLM SETUP
