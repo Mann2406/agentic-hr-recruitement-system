@@ -253,8 +253,9 @@ def send_offer(application_id: str):
     # JWT Auth
     api_client = ApiClient()
     api_client.host = os.getenv("DOCUSIGN_BASE_PATH")
-    with open(os.getenv("DOCUSIGN_PRIVATE_KEY_FILE"), "r") as f:
-        private_key = f.read()
+    # with open(os.getenv("DOCUSIGN_PRIVATE_KEY_FILE"), "r") as f:
+    #     private_key = f.read()
+    private_key = os.getenv("DOCUSIGN_PRIVATE_KEY")
     token = api_client.request_jwt_user_token(
         client_id=os.getenv("DOCUSIGN_INTEGRATION_KEY"),
         user_id=os.getenv("DOCUSIGN_USER_ID"),
